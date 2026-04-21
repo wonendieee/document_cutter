@@ -150,8 +150,8 @@ dify plugin package ./document_cutter
 |---|---|---|---|
 | 纯文本 | ✓ | ✓ | ✓ |
 | 表格 | 部分 | ✓ (Markdown) | ✓ (Markdown) |
-| 图片 | — | ✓ (base64) | — |
-| 图表 | — | ✓ (fallback 图像) | — |
+| 图片 | ✓ (base64) | ✓ (base64) | — |
+| 图表 | ✓ (已渲染为图像) | ✓ (fallback 图像) | — |
 | 按页切分 | 页 | 分页符 | Sheet |
 | 按语义切分 | 段落 | Heading 层级 | Sheet + 行数 |
 | 按锚点切分 | — | ✓ | — |

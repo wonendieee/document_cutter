@@ -24,6 +24,8 @@ def _merge_paragraphs_into_chunks(
     current_texts: list[str] = []
     current_len = 0
     current_meta: dict = {}
+    current_images: list[dict] = []
+    current_image_ids: set[str] = set()
 
     def _build_meta(para: dict) -> dict:
         meta = {}
@@ -36,14 +38,18 @@ def _merge_paragraphs_into_chunks(
         return meta
 
     def _flush():
-        if not current_texts:
+        if not current_texts and not current_images:
             return
         content = "\n".join(current_texts)
-        chunks.append({"content": content, "metadata": {**current_meta}})
+        meta = {**current_meta}
+        if current_images:
+            meta["images"] = list(current_images)
+        chunks.append({"content": content, "metadata": meta})
 
     for para in paragraphs:
         text = para["text"]
         text_len = len(text)
+        para_images = para.get("images") or []
 
         if current_len + text_len > max_chunk_size and current_texts:
             _flush()
@@ -54,11 +60,17 @@ def _merge_paragraphs_into_chunks(
             current_texts = [overlap_text] if overlap_text else []
             current_len = len(overlap_text)
             current_meta = _build_meta(para)
+            current_images = []
+            current_image_ids = set()
 
         current_texts.append(text)
         current_len += text_len
         if not current_meta:
             current_meta = _build_meta(para)
+        for img in para_images:
+            if img["id"] not in current_image_ids:
+                current_image_ids.add(img["id"])
+                current_images.append(img)
 
     _flush()
     return chunks
