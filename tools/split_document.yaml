@@ -1,0 +1,90 @@
+identity:
+  name: split_document
+  author: document_cutter
+  label:
+    en_US: Split Document
+    zh_Hans: 文档切分
+description:
+  human:
+    en_US: Split uploaded documents (PDF, Word, Excel) into structured text chunks by page or semantic structure.
+    zh_Hans: 将上传的文档（PDF、Word、Excel）按页或按语义结构切分为结构化文本块。
+  llm: Split a document file into text chunks. Supports PDF, Word (.docx), and Excel (.xlsx). Returns a JSON array of chunks with content and metadata.
+parameters:
+  - name: file
+    type: file
+    required: true
+    label:
+      en_US: Document File
+      zh_Hans: 文档文件
+    human_description:
+      en_US: The document file to split. Supports PDF, Word (.docx), and Excel (.xlsx/.xls).
+      zh_Hans: 要切分的文档文件，支持 PDF、Word (.docx) 和 Excel (.xlsx/.xls)。
+    llm_description: The document file to be split into chunks.
+    form: llm
+  - name: split_mode
+    type: select
+    required: true
+    label:
+      en_US: Split Mode
+      zh_Hans: 切分模式
+    human_description:
+      en_US: "page: split by page/sheet; semantic: split by heading/paragraph structure."
+      zh_Hans: "page: 按页/Sheet切分; semantic: 按标题/段落语义切分。"
+    llm_description: "Split strategy: 'page' splits by page or sheet, 'semantic' splits by headings and paragraph structure."
+    form: form
+    options:
+      - value: page
+        label:
+          en_US: By Page
+          zh_Hans: 按页切分
+      - value: semantic
+        label:
+          en_US: By Semantic Structure
+          zh_Hans: 按语义切分
+      - value: anchor
+        label:
+          en_US: By Anchors (upstream-provided)
+          zh_Hans: 按锚点切分（上游提供）
+    default: page
+  - name: max_chunk_size
+    type: number
+    required: false
+    label:
+      en_US: Max Chunk Size
+      zh_Hans: 最大块大小
+    human_description:
+      en_US: Maximum characters per chunk in semantic mode. Chunks exceeding this will be split at paragraph boundaries.
+      zh_Hans: 语义模式下每个文本块的最大字符数，超过时在段落边界处二次拆分。
+    llm_description: Maximum number of characters per chunk when using semantic split mode.
+    form: form
+    default: 2000
+    min: 100
+    max: 50000
+  - name: overlap_size
+    type: number
+    required: false
+    label:
+      en_US: Overlap Size
+      zh_Hans: 重叠字符数
+    human_description:
+      en_US: Number of overlapping characters between adjacent chunks in semantic mode.
+      zh_Hans: 语义模式下相邻文本块之间的重叠字符数。
+    llm_description: Number of overlapping characters between adjacent chunks in semantic mode.
+    form: form
+    default: 200
+    min: 0
+    max: 5000
+  - name: anchors
+    type: string
+    required: false
+    label:
+      en_US: Anchors JSON
+      zh_Hans: 锚点 JSON
+    human_description:
+      en_US: Required for anchor mode. JSON string of anchors list with keys section_standard, anchor_primary, anchor_fallbacks, anchor_pos, found. Accepts either a raw list or an object with 'anchors_json' key.
+      zh_Hans: anchor 模式必填。锚点列表 JSON 字符串，包含 section_standard、anchor_primary、anchor_fallbacks、anchor_pos、found 字段。支持直接传列表或包含 anchors_json 键的对象。
+    llm_description: JSON string containing heading anchors for splitting. Only used when split_mode=anchor.
+    form: llm
+extra:
+  python:
+    source: tools/split_document.py

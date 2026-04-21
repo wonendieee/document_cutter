@@ -1,0 +1,17 @@
+identity:
+  author: document_cutter
+  name: document_cutter
+  label:
+    en_US: Document Cutter
+    zh_Hans: 文档切分工具
+  description:
+    en_US: Split documents (PDF, Word, Excel) into structured text chunks.
+    zh_Hans: 将文档（PDF、Word、Excel）切分为结构化文本块。
+  icon: icon.svg
+  tags:
+    - utilities
+tools:
+  - tools/split_document.yaml
+extra:
+  python:
+    source: provider/document_cutter.py
