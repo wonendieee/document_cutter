@@ -5,23 +5,15 @@ name: document_cutter
 label:
   en_US: Document Cutter
   zh_Hans: 文档切分工具
+description:
+  en_US: Split documents (PDF, Word, Excel) into structured text chunks by page, semantic structure, or upstream-provided anchors. Preserves images and tables.
+  zh_Hans: 将文档（PDF、Word、Excel）按页、语义结构或上游锚点切分为结构化文本块，保留图片和表格。
 icon: icon.svg
 resource:
   memory: 268435456
   permission:
     tool:
       enabled: true
-    model:
-      enabled: false
-    node:
-      enabled: false
-    endpoint:
-      enabled: false
-    app:
-      enabled: false
-    storage:
-      enabled: false
-      size: 0
 created_at: "2026-04-17T00:00:00.000Z"
 plugins:
   tools:
