@@ -75,15 +75,15 @@ parameters:
     min: 0
     max: 5000
   - name: anchors
-    type: string
+    type: array
     required: false
     label:
-      en_US: Anchors JSON
-      zh_Hans: 锚点 JSON
+      en_US: Anchors
+      zh_Hans: 锚点列表
     human_description:
-      en_US: Required for anchor mode. JSON string of anchors list with keys section_standard, anchor_primary, anchor_fallbacks, anchor_pos, found. Accepts either a raw list or an object with 'anchors_json' key.
-      zh_Hans: anchor 模式必填。锚点列表 JSON 字符串，包含 section_standard、anchor_primary、anchor_fallbacks、anchor_pos、found 字段。支持直接传列表或包含 anchors_json 键的对象。
-    llm_description: JSON string containing heading anchors for splitting. Only used when split_mode=anchor.
+      en_US: Required for anchor mode. List of anchor objects (Array[Object]) with keys section_standard, anchor_primary, anchor_fallbacks, anchor_pos, found. Also accepts a JSON string or a dict with 'anchors_json' key.
+      zh_Hans: anchor 模式必填。锚点列表（Array[Object]），每项含 section_standard、anchor_primary、anchor_fallbacks、anchor_pos、found 字段。也支持 JSON 字符串或包含 anchors_json 键的对象。
+    llm_description: Array of heading anchor objects for splitting. Only used when split_mode=anchor.
     form: llm
 extra:
   python:

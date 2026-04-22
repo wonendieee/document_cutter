@@ -92,7 +92,7 @@ dify plugin package ./document_cutter
 | `split_mode` | select | `page` / `semantic` / `anchor` |
 | `max_chunk_size` | number | 语义模式下单块最大字符数（默认 2000） |
 | `overlap_size` | number | 语义模式下相邻块重叠字符数（默认 200） |
-| `anchors` | string | anchor 模式必填。锚点 JSON 字符串 |
+| `anchors` | array | anchor 模式必填。锚点列表，支持 `Array[Object]`、JSON 字符串、或含 `anchors_json` 键的对象三种输入 |
 
 ### 输出格式
 
@@ -127,22 +127,40 @@ dify plugin package ./document_cutter
 
 ### anchor 模式输入格式
 
+`anchors` 参数类型为 `array`，支持以下三种输入：
+
+**方式 1：直接传 Array[Object]（推荐，上游代码节点可直接连接）**
+
+```json
+[
+  {
+    "section_standard": "作业和活动概况",
+    "anchor_primary": "项目概况",
+    "anchor_fallbacks": ["项目背景"],
+    "anchor_pos": 2,
+    "confidence": 0.85,
+    "found": true
+  }
+]
+```
+
+**方式 2：JSON 字符串**
+
+```
+"[{\"section_standard\": \"作业和活动概况\", \"anchor_primary\": \"项目概况\", ...}]"
+```
+
+**方式 3：包含 `anchors_json` 键的对象**
+
 ```json
 {
   "anchors_json": [
-    {
-      "section_standard": "作业和活动概况",
-      "anchor_primary": "项目概况",
-      "anchor_fallbacks": ["项目背景"],
-      "anchor_pos": 2,
-      "confidence": 0.85,
-      "found": true
-    }
+    { "section_standard": "作业和活动概况", ... }
   ]
 }
 ```
 
-也支持直接传入 `anchors_json` 列表本身。
+Dify Workflow 中，上游代码节点的 `Array[Object]` 类型输出可直接连接到本节点的 `anchors` 参数。
 
 ## 能力矩阵
 
