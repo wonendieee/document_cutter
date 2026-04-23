@@ -154,7 +154,7 @@ class SplitDocumentTool(Tool):
             )
             return
 
-        split_mode = tool_parameters.get("split_mode") or "page_text"
+        split_mode = tool_parameters.get("split_mode") or "page_file"
         page_range = str(tool_parameters.get("page_range") or "")
         pages_per_chunk = int(tool_parameters.get("pages_per_chunk") or 1)
         delivery_mode = str(tool_parameters.get("delivery_mode") or "blob")

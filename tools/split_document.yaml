@@ -41,7 +41,7 @@ parameters:
         label:
           en_US: Same-Format File
           zh_Hans: 同格式文件输出
-    default: page_text
+    default: page_file
   - name: page_range
     type: string
     required: false
@@ -83,7 +83,7 @@ parameters:
       - value: blob
         label:
           en_US: Blob (direct)
-          zh_Hans: 直接 Blob 返回
+          zh_Hans: 直接文件
       - value: upload_link
         label:
           en_US: Upload Link (external service)
