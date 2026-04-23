@@ -47,13 +47,19 @@ def _extract_page_images(doc, page, image_counter: list[int]) -> list[dict]:
     return images
 
 
-def parse_pdf_by_page(file_bytes: bytes) -> list[dict]:
-    """Extract text and images from each page of a PDF, returning one chunk per page."""
+def parse_pdf_by_page(file_bytes: bytes, page_indices: set[int] | None = None) -> list[dict]:
+    """
+    Extract text and images from each page of a PDF, returning one chunk per page.
+    page_indices: optional set of 0-based page indices to keep. None = all pages.
+    """
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     image_counter = [0]
     chunks = []
 
-    for i, page in enumerate(doc):
+    for i in range(doc.page_count):
+        if page_indices is not None and i not in page_indices:
+            continue
+        page = doc.load_page(i)
         text = page.get_text("text").strip()
         images = _extract_page_images(doc, page, image_counter)
 
@@ -77,36 +83,3 @@ def parse_pdf_by_page(file_bytes: bytes) -> list[dict]:
     return chunks
 
 
-def parse_pdf_full_text(file_bytes: bytes) -> tuple[str, list[dict]]:
-    """
-    Extract paragraphs and images for semantic splitting.
-    Images appear as paragraphs with text=[IMAGE:id] and a non-empty 'images' field,
-    so the chunk merger can interleave them with text naturally.
-    """
-    doc = fitz.open(stream=file_bytes, filetype="pdf")
-    image_counter = [0]
-    paragraphs: list[dict] = []
-
-    for i, page in enumerate(doc):
-        text = page.get_text("text").strip()
-        if text:
-            for para in text.split("\n\n"):
-                para = para.strip()
-                if para:
-                    paragraphs.append({
-                        "text": para,
-                        "page": i + 1,
-                        "images": [],
-                    })
-
-        images = _extract_page_images(doc, page, image_counter)
-        for img in images:
-            paragraphs.append({
-                "text": f"[IMAGE:{img['id']}]",
-                "page": i + 1,
-                "images": [img],
-            })
-
-    doc.close()
-    full_text = "\n\n".join(p["text"] for p in paragraphs)
-    return full_text, paragraphs

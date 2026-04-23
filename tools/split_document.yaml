@@ -6,9 +6,9 @@ identity:
     zh_Hans: 文档切分
 description:
   human:
-    en_US: Split uploaded documents (PDF, Word, Excel) into structured text chunks by page or semantic structure.
-    zh_Hans: 将上传的文档（PDF、Word、Excel）按页或按语义结构切分为结构化文本块。
-  llm: Split a document file into text chunks. Supports PDF, Word (.docx), and Excel (.xlsx). Returns a JSON array of chunks with content and metadata.
+    en_US: Extract a page range from PDF / Word / Excel documents, output either text chunks or a same-format binary file.
+    zh_Hans: 按页码范围从 PDF / Word / Excel 文档中提取内容，输出文本块或同格式的二进制文件。
+  llm: Extract a page range from a document. Output mode can be text chunks or a same-format file (PDF->PDF, docx->docx, xlsx->xlsx).
 parameters:
   - name: file
     type: file
@@ -17,74 +17,90 @@ parameters:
       en_US: Document File
       zh_Hans: 文档文件
     human_description:
-      en_US: The document file to split. Supports PDF, Word (.docx), and Excel (.xlsx/.xls).
-      zh_Hans: 要切分的文档文件，支持 PDF、Word (.docx) 和 Excel (.xlsx/.xls)。
-    llm_description: The document file to be split into chunks.
+      en_US: The document file. Supports PDF, Word (.docx), and Excel (.xlsx/.xls).
+      zh_Hans: 文档文件，支持 PDF、Word (.docx) 和 Excel (.xlsx/.xls)。
+    llm_description: The document file.
     form: llm
   - name: split_mode
     type: select
     required: true
     label:
-      en_US: Split Mode
-      zh_Hans: 切分模式
+      en_US: Output Mode
+      zh_Hans: 输出模式
     human_description:
-      en_US: "page: split by page/sheet; semantic: split by heading/paragraph structure."
-      zh_Hans: "page: 按页/Sheet切分; semantic: 按标题/段落语义切分。"
-    llm_description: "Split strategy: 'page' splits by page or sheet, 'semantic' splits by headings and paragraph structure."
+      en_US: "page_text: output text chunks per page. page_file: output one same-format binary file containing the selected pages."
+      zh_Hans: "page_text: 按页输出文本块。page_file: 输出包含指定页码的同格式二进制文件（PDF->PDF，docx->docx，xlsx->xlsx）。"
+    llm_description: "Output format: 'page_text' returns text chunks, 'page_file' returns a binary file of the same format."
     form: form
     options:
-      - value: page
+      - value: page_text
         label:
-          en_US: By Page
-          zh_Hans: 按页切分
-      - value: semantic
+          en_US: Text Chunks
+          zh_Hans: 文本块输出
+      - value: page_file
         label:
-          en_US: By Semantic Structure
-          zh_Hans: 按语义切分
-      - value: anchor
-        label:
-          en_US: By Anchors (upstream-provided)
-          zh_Hans: 按锚点切分（上游提供）
-    default: page
-  - name: max_chunk_size
+          en_US: Same-Format File
+          zh_Hans: 同格式文件输出
+    default: page_text
+  - name: page_range
+    type: string
+    required: false
+    label:
+      en_US: Page Range
+      zh_Hans: 页码范围
+    human_description:
+      en_US: "1-based inclusive page range. Examples: '1-10', '5-' (from 5 to end), '-3' (first 3), '7' (single page), '' (all). For Word, page means manual page-break count. For Excel, page means sheet index."
+      zh_Hans: "1 起始的闭区间页码。示例：'1-10'、'5-'（第5页到末尾）、'-3'（前3页）、'7'（单页）、空（全部）。Word 的页码按手动分页符计数；Excel 的页码按 Sheet 序号。"
+    llm_description: Page range to extract. Format 'N-M' or 'N-' or '-M' or 'N'. Empty means all pages.
+    form: form
+    default: ""
+  - name: pages_per_chunk
     type: number
     required: false
     label:
-      en_US: Max Chunk Size
-      zh_Hans: 最大块大小
+      en_US: Pages Per Chunk (text mode)
+      zh_Hans: 每N页合并为一块（仅文本模式）
     human_description:
-      en_US: Maximum characters per chunk in semantic mode. Chunks exceeding this will be split at paragraph boundaries.
-      zh_Hans: 语义模式下每个文本块的最大字符数，超过时在段落边界处二次拆分。
-    llm_description: Maximum number of characters per chunk when using semantic split mode.
+      en_US: Text mode only. Group every N consecutive pages into one chunk. Default 1.
+      zh_Hans: 仅文本块输出模式生效。每 N 页合并为一个 chunk。默认 1（每页一块）。
+    llm_description: Number of consecutive pages to merge into one chunk in text mode.
     form: form
-    default: 2000
-    min: 100
-    max: 50000
-  - name: overlap_size
-    type: number
+    default: 1
+    min: 1
+    max: 100
+  - name: delivery_mode
+    type: select
     required: false
     label:
-      en_US: Overlap Size
-      zh_Hans: 重叠字符数
+      en_US: Delivery Mode (page_file only)
+      zh_Hans: 文件交付方式（仅 page_file 模式）
     human_description:
-      en_US: Number of overlapping characters between adjacent chunks in semantic mode.
-      zh_Hans: 语义模式下相邻文本块之间的重叠字符数。
-    llm_description: Number of overlapping characters between adjacent chunks in semantic mode.
+      en_US: "blob: return file as Dify blob (requires correct FILES_URL). upload_link: POST to external upload service (configured in provider credentials) and return download_url."
+      zh_Hans: "blob: 以 Dify 文件 blob 返回（依赖 FILES_URL 配置正确）。upload_link: POST 到外部上传服务（在 Provider 凭证中配置），返回下载链接。"
+    llm_description: "File delivery method for page_file mode."
     form: form
-    default: 200
-    min: 0
-    max: 5000
-  - name: anchors
-    type: array
+    options:
+      - value: blob
+        label:
+          en_US: Blob (direct)
+          zh_Hans: 直接 Blob 返回
+      - value: upload_link
+        label:
+          en_US: Upload Link (external service)
+          zh_Hans: 外部服务上传并返回链接
+    default: upload_link
+  - name: output_filename
+    type: string
     required: false
     label:
-      en_US: Anchors
-      zh_Hans: 锚点列表
+      en_US: Output Filename (without ext)
+      zh_Hans: 输出文件名（不含扩展名）
     human_description:
-      en_US: Required for anchor mode. List of anchor objects (Array[Object]) with keys section_standard, anchor_primary, anchor_fallbacks, anchor_pos, found. Also accepts a JSON string or a dict with 'anchors_json' key.
-      zh_Hans: anchor 模式必填。锚点列表（Array[Object]），每项含 section_standard、anchor_primary、anchor_fallbacks、anchor_pos、found 字段。也支持 JSON 字符串或包含 anchors_json 键的对象。
-    llm_description: Array of heading anchor objects for splitting. Only used when split_mode=anchor.
-    form: llm
+      en_US: Optional custom base name for the output file. Auto-sanitized. Leave blank to auto-generate.
+      zh_Hans: 自定义输出文件名（不含扩展名），会自动清洗非法字符。留空则自动命名。
+    llm_description: Custom base name for the output file without extension.
+    form: form
+    default: ""
 extra:
   python:
     source: tools/split_document.py
