@@ -157,7 +157,7 @@ class SplitDocumentTool(Tool):
         split_mode = tool_parameters.get("split_mode") or "page_text"
         page_range = str(tool_parameters.get("page_range") or "")
         pages_per_chunk = int(tool_parameters.get("pages_per_chunk") or 1)
-        delivery_mode = str(tool_parameters.get("delivery_mode") or "upload_link")
+        delivery_mode = str(tool_parameters.get("delivery_mode") or "blob")
         custom_name = str(tool_parameters.get("output_filename") or "").strip()
 
         try:
@@ -179,11 +179,13 @@ class SplitDocumentTool(Tool):
                     yield from self._deliver_upload(out_bytes, out_name, mime, result)
                     return
 
+                yield self.create_json_message(result)
+                for key, value in result.items():
+                    yield self.create_variable_message(key, value)
                 yield self.create_blob_message(
                     blob=out_bytes,
-                    meta={"mime_type": mime, "filename": out_name},
+                    meta={"file_name": out_name, "mime_type": mime},
                 )
-                yield self.create_json_message(result)
                 return
 
             raw_chunks = split_by_page(

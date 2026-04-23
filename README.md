@@ -91,7 +91,7 @@ dify plugin package ./document_cutter
 | `split_mode` | select | 是 | `page_text`（文本块）或 `page_file`（同格式文件） |
 | `page_range` | string | 否 | 1-based 闭区间页码。示例：`1-10`、`5-`、`-3`、`7`、空=全部 |
 | `pages_per_chunk` | number | 否 | 仅 `page_text` 模式生效，每 N 页合并为一块，默认 1 |
-| `delivery_mode` | select | 否 | 仅 `page_file` 模式生效。`blob`=Dify 原生文件返回；`upload_link`=上传到外部服务并返回下载链接（推荐）。默认 `upload_link` |
+| `delivery_mode` | select | 否 | 仅 `page_file` 模式生效。`blob`=Dify 原生 File 变量（下游节点可直接读取，默认，推荐）；`upload_link`=上传到外部 HTTP 服务并返回下载链接（仅需要浏览器直接下载且 `FILES_URL` 不可达时使用） |
 | `output_filename` | string | 否 | `page_file` 的自定义基础文件名（不含扩展名），留空自动命名 |
 
 ### 页码语法

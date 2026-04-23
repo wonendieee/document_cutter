@@ -88,7 +88,7 @@ parameters:
         label:
           en_US: Upload Link (external service)
           zh_Hans: 外部服务上传并返回链接
-    default: upload_link
+    default: blob
   - name: output_filename
     type: string
     required: false
