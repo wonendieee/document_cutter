@@ -17,12 +17,41 @@ from core.splitters.page_splitter import split_by_page
 
 SUPPORTED_EXTENSIONS = {"pdf", "docx", "xlsx", "xls"}
 
+INTERNAL_FILES_URL_CANDIDATES = [
+    os.environ.get("INTERNAL_FILES_URL", "").rstrip("/"),
+    os.environ.get("FILES_URL", "").rstrip("/"),
+    "http://api:5001",
+    "http://host.docker.internal:5001",
+]
+
 EXT_TO_MIME = {
     "pdf": "application/pdf",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "xls": "application/vnd.ms-excel",
 }
+
+
+def _fetch_by_url_fallback(url: str) -> bytes:
+    """If url is relative (no scheme), try prefixing internal Dify API hosts."""
+    last_err: Exception | None = None
+    candidates = [u for u in INTERNAL_FILES_URL_CANDIDATES if u] or ["http://api:5001"]
+    seen = set()
+    for base in candidates:
+        if base in seen:
+            continue
+        seen.add(base)
+        full = base + url if url.startswith("/") else f"{base}/{url}"
+        try:
+            resp = requests.get(full, timeout=30)
+            resp.raise_for_status()
+            return resp.content
+        except Exception as e:
+            last_err = e
+            continue
+    raise RuntimeError(
+        f"Could not fetch file from any internal URL candidate for path '{url}'. Last error: {last_err}"
+    )
 
 
 def _extract_file_bytes(file_info) -> tuple[str, bytes]:
@@ -33,18 +62,32 @@ def _extract_file_bytes(file_info) -> tuple[str, bytes]:
         file_info = file_info[0]
 
     if hasattr(file_info, "blob"):
-        return (
+        file_name = (
             getattr(file_info, "filename", None)
             or getattr(file_info, "name", None)
-            or "unknown",
-            file_info.blob,
+            or "unknown"
         )
+        try:
+            return file_name, file_info.blob
+        except Exception:
+            url = getattr(file_info, "url", "") or ""
+            if url and not url.startswith(("http://", "https://")):
+                return file_name, _fetch_by_url_fallback(url)
+            raise
 
     if isinstance(file_info, dict):
         file_name = file_info.get("filename") or file_info.get("name") or "unknown"
         file_bytes = file_info.get("blob") or file_info.get("content") or b""
         if isinstance(file_bytes, str):
             file_bytes = base64.b64decode(file_bytes)
+        if not file_bytes:
+            url = file_info.get("url") or ""
+            if url and not url.startswith(("http://", "https://")):
+                file_bytes = _fetch_by_url_fallback(url)
+            elif url:
+                resp = requests.get(url, timeout=30)
+                resp.raise_for_status()
+                file_bytes = resp.content
         return file_name, file_bytes
 
     if hasattr(file_info, "read"):
@@ -179,6 +222,18 @@ class SplitDocumentTool(Tool):
                     yield from self._deliver_upload(out_bytes, out_name, mime, result)
                     return
 
+                creds = getattr(self.runtime, "credentials", {}) or {}
+                upload_url_cfg = str(creds.get("upload_url") or "").strip()
+                if upload_url_cfg:
+                    try:
+                        download_url, uploaded_name = self._upload_to_service(
+                            out_bytes, out_name, mime, creds
+                        )
+                        result["download_url"] = download_url
+                        result["returned_file_name"] = uploaded_name
+                    except Exception as e:
+                        result["upload_error"] = str(e)
+
                 yield self.create_json_message(result)
                 for key, value in result.items():
                     yield self.create_variable_message(key, value)
@@ -186,6 +241,8 @@ class SplitDocumentTool(Tool):
                     blob=out_bytes,
                     meta={"file_name": out_name, "mime_type": mime},
                 )
+                if result.get("download_url"):
+                    yield self.create_text_message(f"Download URL: {result['download_url']}")
                 return
 
             raw_chunks = split_by_page(
@@ -215,21 +272,17 @@ class SplitDocumentTool(Tool):
             "chunks": chunks,
         })
 
-    def _deliver_upload(
+    def _upload_to_service(
         self,
         out_bytes: bytes,
         out_name: str,
         mime: str,
-        result: dict,
-    ) -> Generator[ToolInvokeMessage]:
-        creds = getattr(self.runtime, "credentials", {}) or {}
-
+        creds: dict,
+    ) -> tuple[str, str]:
+        """Upload file to external service, return (download_url, returned_file_name)."""
         upload_url = str(creds.get("upload_url") or "").strip()
         if not upload_url:
-            yield self.create_text_message(
-                "Error: Provider credential 'upload_url' is required when delivery_mode=upload_link."
-            )
-            return
+            raise ValueError("Provider credential 'upload_url' is empty.")
 
         upload_token = str(creds.get("upload_token") or "").strip()
         file_field = (str(creds.get("upload_file_field_name") or "file").strip() or "file")
@@ -242,12 +295,8 @@ class SplitDocumentTool(Tool):
             or "file_name"
         )
 
-        try:
-            headers = _load_json_object(str(creds.get("upload_headers_json") or ""), {})
-            form_data = _load_json_object(str(creds.get("upload_form_data_json") or ""), {})
-        except ValueError as e:
-            yield self.create_text_message(f"Error: invalid provider credential JSON. {e}")
-            return
+        headers = _load_json_object(str(creds.get("upload_headers_json") or ""), {})
+        form_data = _load_json_object(str(creds.get("upload_form_data_json") or ""), {})
 
         form_data.setdefault("desired_name", out_name)
         if upload_token:
@@ -255,32 +304,48 @@ class SplitDocumentTool(Tool):
 
         files = {file_field: (out_name, io.BytesIO(out_bytes), mime)}
 
-        try:
-            resp = requests.post(
-                upload_url,
-                headers=headers,
-                data=form_data,
-                files=files,
-                timeout=60,
-            )
-            resp.raise_for_status()
-            resp_json = resp.json()
-        except Exception as e:
-            yield self.create_text_message(f"Error uploading file to {upload_url}: {e}")
-            return
+        resp = requests.post(
+            upload_url,
+            headers=headers,
+            data=form_data,
+            files=files,
+            timeout=60,
+        )
+        resp.raise_for_status()
+        resp_json = resp.json()
 
         if not isinstance(resp_json, dict):
-            yield self.create_text_message("Error: upload service must return a JSON object.")
-            return
+            raise ValueError("Upload service must return a JSON object.")
 
         download_url = resp_json.get(resp_url_field)
         uploaded_name = resp_json.get(resp_name_field) or out_name
 
         if not download_url:
-            yield self.create_text_message(
-                f"Error: upload succeeded but response field '{resp_url_field}' not found. "
+            raise ValueError(
+                f"Upload succeeded but response field '{resp_url_field}' not found. "
                 f"Response keys: {list(resp_json.keys())}"
             )
+
+        return str(download_url), str(uploaded_name)
+
+    def _deliver_upload(
+        self,
+        out_bytes: bytes,
+        out_name: str,
+        mime: str,
+        result: dict,
+    ) -> Generator[ToolInvokeMessage]:
+        creds = getattr(self.runtime, "credentials", {}) or {}
+        if not str(creds.get("upload_url") or "").strip():
+            yield self.create_text_message(
+                "Error: Provider credential 'upload_url' is required when delivery_mode=upload_link."
+            )
+            return
+
+        try:
+            download_url, uploaded_name = self._upload_to_service(out_bytes, out_name, mime, creds)
+        except Exception as e:
+            yield self.create_text_message(f"Error uploading file: {e}")
             return
 
         result["download_url"] = download_url
