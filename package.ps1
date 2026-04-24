@@ -1,5 +1,5 @@
 # Dify 插件打包脚本 (Windows PowerShell)
-# 用法: 在 document_cutter 的上级目录运行，或直接在本目录运行此脚本
+# 用法: 在 document_cutter 的上级目录运行，或直接在本目录运行此脚本 ./package.ps1
 
 $ErrorActionPreference = "Stop"
 

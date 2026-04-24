@@ -61,16 +61,52 @@ def _extract_file_bytes(file_info) -> tuple[str, bytes]:
             raise ValueError("File list is empty.")
         file_info = file_info[0]
 
-    if hasattr(file_info, "blob"):
+    # Probe Dify File pydantic model by class definition, NOT by hasattr on the instance.
+    # hasattr(instance, 'blob') would trigger the .blob property which fires httpx.get and can
+    # raise ValueError (not AttributeError). hasattr propagates that out, bypassing fallback.
+    is_file_like = (
+        not isinstance(file_info, dict)
+        and hasattr(file_info.__class__, "blob")
+        and hasattr(file_info, "url")
+    )
+    if is_file_like:
         file_name = (
             getattr(file_info, "filename", None)
             or getattr(file_info, "name", None)
             or "unknown"
         )
+        # Prefer URL-based fetch when URL is relative — skip the broken SDK .blob entirely.
+        url_pre = ""
+        try:
+            url_pre = getattr(file_info, "url", "") or ""
+        except Exception:
+            pass
+        if url_pre and not url_pre.startswith(("http://", "https://")):
+            return file_name, _fetch_by_url_fallback(url_pre)
         try:
             return file_name, file_info.blob
-        except Exception:
-            url = getattr(file_info, "url", "") or ""
+        except Exception as blob_err:
+            # 1) try .url attribute (may be None when FILES_URL is unset)
+            url = ""
+            try:
+                url = getattr(file_info, "url", "") or ""
+            except Exception:
+                pass
+            # 2) if .url is empty/absolute, try to extract relative path from
+            #    the SDK error message, e.g. "Invalid file URL '/files/UUID/...'"
+            if not url or url.startswith(("http://", "https://")):
+                import re as _re
+                m = _re.search(r"'(/files/[^']+)'", str(blob_err))
+                if m:
+                    url = m.group(1)
+            # 3) last resort: use related_id to build minimal path
+            if not url or url.startswith(("http://", "https://")):
+                related_id = (
+                    getattr(file_info, "related_id", None)
+                    or getattr(file_info, "upload_file_id", None)
+                )
+                if related_id:
+                    url = f"/files/{related_id}/file-preview"
             if url and not url.startswith(("http://", "https://")):
                 return file_name, _fetch_by_url_fallback(url)
             raise

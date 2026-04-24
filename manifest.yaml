@@ -1,4 +1,4 @@
-version: 0.0.1
+version: 0.0.3
 type: plugin
 author: document_cutter
 name: document_cutter
@@ -6,8 +6,8 @@ label:
   en_US: Document Cutter
   zh_Hans: 文档切分工具
 description:
-  en_US: Split documents (PDF, Word, Excel) into structured text chunks by page, semantic structure, or upstream-provided anchors. Preserves images and tables.
-  zh_Hans: 将文档（PDF、Word、Excel）按页、语义结构或上游锚点切分为结构化文本块，保留图片和表格。
+  en_US: Extract a page range from PDF/Word/Excel, output text chunks or same-format file. Robust against Dify FILES_URL misconfiguration via internal URL fallback.
+  zh_Hans: 按页码范围从 PDF/Word/Excel 中提取内容，输出文本块或同格式文件；针对 Dify FILES_URL 未配的场景提供内部地址兜底，读文件更稳。
 icon: icon.svg
 resource:
   memory: 268435456
@@ -19,7 +19,7 @@ plugins:
   tools:
     - provider/document_cutter.yaml
 meta:
-  version: 0.0.1
+  version: 0.0.3
   arch:
     - amd64
     - arm64
