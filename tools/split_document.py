@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import base64
-import io
-import json
 import os
 import re
 from collections.abc import Generator
@@ -194,19 +192,6 @@ def _build_output_filename(
     return f"{base}{tag}{ext}"
 
 
-def _load_json_object(raw: str, default: dict) -> dict:
-    raw = (raw or "").strip()
-    if not raw:
-        return dict(default)
-    try:
-        obj = json.loads(raw)
-    except Exception as e:
-        raise ValueError(f"Invalid JSON: {e}") from e
-    if not isinstance(obj, dict):
-        raise ValueError("JSON must decode to an object.")
-    return obj
-
-
 class SplitDocumentTool(Tool):
     def _invoke(
         self, tool_parameters: dict[str, Any]
@@ -236,7 +221,6 @@ class SplitDocumentTool(Tool):
         split_mode = tool_parameters.get("split_mode") or "page_file"
         page_range = str(tool_parameters.get("page_range") or "")
         pages_per_chunk = int(tool_parameters.get("pages_per_chunk") or 1)
-        delivery_mode = str(tool_parameters.get("delivery_mode") or "blob")
         custom_name = str(tool_parameters.get("output_filename") or "").strip()
 
         try:
@@ -251,24 +235,7 @@ class SplitDocumentTool(Tool):
                     "size_bytes": len(out_bytes),
                     "source_file": file_name,
                     "page_range": page_range or "all",
-                    "delivery_mode": delivery_mode,
                 }
-
-                if delivery_mode == "upload_link":
-                    yield from self._deliver_upload(out_bytes, out_name, mime, result)
-                    return
-
-                creds = getattr(self.runtime, "credentials", {}) or {}
-                upload_url_cfg = str(creds.get("upload_url") or "").strip()
-                if upload_url_cfg:
-                    try:
-                        download_url, uploaded_name = self._upload_to_service(
-                            out_bytes, out_name, mime, creds
-                        )
-                        result["download_url"] = download_url
-                        result["returned_file_name"] = uploaded_name
-                    except Exception as e:
-                        result["upload_error"] = str(e)
 
                 yield self.create_json_message(result)
                 for key, value in result.items():
@@ -277,8 +244,6 @@ class SplitDocumentTool(Tool):
                     blob=out_bytes,
                     meta={"file_name": out_name, "mime_type": mime},
                 )
-                if result.get("download_url"):
-                    yield self.create_text_message(f"Download URL: {result['download_url']}")
                 return
 
             raw_chunks = split_by_page(
@@ -307,87 +272,3 @@ class SplitDocumentTool(Tool):
             "split_mode": split_mode,
             "chunks": chunks,
         })
-
-    def _upload_to_service(
-        self,
-        out_bytes: bytes,
-        out_name: str,
-        mime: str,
-        creds: dict,
-    ) -> tuple[str, str]:
-        """Upload file to external service, return (download_url, returned_file_name)."""
-        upload_url = str(creds.get("upload_url") or "").strip()
-        if not upload_url:
-            raise ValueError("Provider credential 'upload_url' is empty.")
-
-        upload_token = str(creds.get("upload_token") or "").strip()
-        file_field = (str(creds.get("upload_file_field_name") or "file").strip() or "file")
-        resp_url_field = (
-            str(creds.get("response_download_url_field") or "download_url").strip()
-            or "download_url"
-        )
-        resp_name_field = (
-            str(creds.get("response_file_name_field") or "file_name").strip()
-            or "file_name"
-        )
-
-        headers = _load_json_object(str(creds.get("upload_headers_json") or ""), {})
-        form_data = _load_json_object(str(creds.get("upload_form_data_json") or ""), {})
-
-        form_data.setdefault("desired_name", out_name)
-        if upload_token:
-            headers.setdefault("Authorization", f"Bearer {upload_token}")
-
-        files = {file_field: (out_name, io.BytesIO(out_bytes), mime)}
-
-        resp = requests.post(
-            upload_url,
-            headers=headers,
-            data=form_data,
-            files=files,
-            timeout=60,
-        )
-        resp.raise_for_status()
-        resp_json = resp.json()
-
-        if not isinstance(resp_json, dict):
-            raise ValueError("Upload service must return a JSON object.")
-
-        download_url = resp_json.get(resp_url_field)
-        uploaded_name = resp_json.get(resp_name_field) or out_name
-
-        if not download_url:
-            raise ValueError(
-                f"Upload succeeded but response field '{resp_url_field}' not found. "
-                f"Response keys: {list(resp_json.keys())}"
-            )
-
-        return str(download_url), str(uploaded_name)
-
-    def _deliver_upload(
-        self,
-        out_bytes: bytes,
-        out_name: str,
-        mime: str,
-        result: dict,
-    ) -> Generator[ToolInvokeMessage]:
-        creds = getattr(self.runtime, "credentials", {}) or {}
-        if not str(creds.get("upload_url") or "").strip():
-            yield self.create_text_message(
-                "Error: Provider credential 'upload_url' is required when delivery_mode=upload_link."
-            )
-            return
-
-        try:
-            download_url, uploaded_name = self._upload_to_service(out_bytes, out_name, mime, creds)
-        except Exception as e:
-            yield self.create_text_message(f"Error uploading file: {e}")
-            return
-
-        result["download_url"] = download_url
-        result["returned_file_name"] = uploaded_name
-
-        yield self.create_json_message(result)
-        for key, value in result.items():
-            yield self.create_variable_message(key, value)
-        yield self.create_text_message(f"Download URL: {download_url}")

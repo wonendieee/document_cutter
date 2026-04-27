@@ -68,27 +68,6 @@ parameters:
     default: 1
     min: 1
     max: 100
-  - name: delivery_mode
-    type: select
-    required: false
-    label:
-      en_US: Delivery Mode (page_file only)
-      zh_Hans: 文件交付方式（仅 page_file 模式）
-    human_description:
-      en_US: "blob: return file as Dify blob (requires correct FILES_URL). upload_link: POST to external upload service (configured in provider credentials) and return download_url."
-      zh_Hans: "blob: 以 Dify 文件 blob 返回（依赖 FILES_URL 配置正确）。upload_link: POST 到外部上传服务（在 Provider 凭证中配置），返回下载链接。"
-    llm_description: "File delivery method for page_file mode."
-    form: form
-    options:
-      - value: blob
-        label:
-          en_US: Blob (direct)
-          zh_Hans: 直接文件
-      - value: upload_link
-        label:
-          en_US: Upload Link (external service)
-          zh_Hans: 外部服务上传并返回链接
-    default: blob
   - name: output_filename
     type: string
     required: false

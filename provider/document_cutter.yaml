@@ -5,76 +5,11 @@ identity:
     en_US: Document Cutter
     zh_Hans: 文档切分工具
   description:
-    en_US: Extract a page range from PDF/Word/Excel, output text chunks or same-format file (direct blob or uploaded via external HTTP service).
-    zh_Hans: 按页码范围从 PDF/Word/Excel 中提取内容，输出文本块或同格式文件（直接 blob 返回，或上传到外部 HTTP 服务后返回下载链接）。
+    en_US: Extract a page range from PDF/Word/Excel, output text chunks or same-format file (returned as Dify blob).
+    zh_Hans: 按页码范围从 PDF/Word/Excel 中提取内容，输出文本块或同格式文件（以 Dify 文件 blob 直接返回）。
   icon: icon.svg
   tags:
     - utilities
-
-credentials_for_provider:
-  upload_url:
-    type: text-input
-    required: false
-    label:
-      en_US: Upload URL
-      zh_Hans: 上传URL
-    placeholder:
-      en_US: http://host.docker.internal:8000/upload
-      zh_Hans: http://host.docker.internal:8000/upload
-    help:
-      en_US: HTTP endpoint that accepts a multipart/form-data POST and returns a JSON containing a download URL. Required when delivery_mode=upload_link.
-      zh_Hans: 接受 multipart/form-data POST 并返回含下载链接 JSON 的 HTTP 端点。delivery_mode=upload_link 时必填。
-
-  upload_token:
-    type: secret-input
-    required: false
-    label:
-      en_US: Upload Token (Bearer)
-      zh_Hans: 上传令牌 (Bearer)
-
-  upload_file_field_name:
-    type: text-input
-    required: false
-    default: file
-    label:
-      en_US: Upload File Field Name
-      zh_Hans: 上传文件字段名
-
-  response_download_url_field:
-    type: text-input
-    required: false
-    default: download_url
-    label:
-      en_US: Response Download URL Field
-      zh_Hans: 响应下载链接字段
-
-  response_file_name_field:
-    type: text-input
-    required: false
-    default: file_name
-    label:
-      en_US: Response File Name Field
-      zh_Hans: 响应文件名字段
-
-  upload_headers_json:
-    type: text-input
-    required: false
-    label:
-      en_US: Upload Headers JSON
-      zh_Hans: 上传请求头JSON
-    placeholder:
-      en_US: '{"X-Workspace":"demo"}'
-      zh_Hans: '{"X-Workspace":"demo"}'
-
-  upload_form_data_json:
-    type: text-input
-    required: false
-    label:
-      en_US: Upload Form Data JSON
-      zh_Hans: 上传表单额外JSON
-    placeholder:
-      en_US: '{"bucket":"documents"}'
-      zh_Hans: '{"bucket":"documents"}'
 
 tools:
   - tools/split_document.yaml
